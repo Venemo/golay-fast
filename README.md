@@ -1,4 +1,4 @@
-# Fast golay encoder and decoder
+# Fast Golay encoder and decoder
 
 A fast encoder and decoder for the systematic Golay-24 code.
 
@@ -7,6 +7,7 @@ output for every possible input. (There are only 4096 possible inputs, so this i
 to verify.)
 
 Created by Timur Kristóf, used on board the SMOG-P/SMOG-1/ATL-1 satellites.
+Code published here under the MIT license.
 
 ## Encoding
 
@@ -38,6 +39,14 @@ used here is something else entirely.
    or equal to 2.
 8. If we reached this point, we detected an unfixable 4-bit error.
 
+This approach can be mathematically proven using the fact that the Hamming distance
+between any two Golay-24 code words is at least 7.
+
+The resulting algorithm is faster than syndrome-based decoding, because it requires
+fewer loop iterations, in fact correcting some types of errors doesn't need a loop
+at all. The more complicated error cases need only 12 loop iterations. It is also
+better with regards to memory use, since there is no need to store a lookup
+table, only the Golay generator matrix.
 
 ### When FEC is not used for error detection
 
