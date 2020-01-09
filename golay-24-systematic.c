@@ -171,7 +171,7 @@ uint_fast16_t golay_24_systematic_decode(uint32_t x)
     //
     // - the Golay matrix is its own inverse and transpose (therefore columns and rows are equivalent)
     // - the error pattern of one-bit errors is therefore the same as the matrix column selected by the error bit
-    // - the Hamming distance between any two codewords is at least 7
+    // - the Hamming distance between any two codewords is at least 8
     // - since the Golay code can only fix at most 3 errors, assume here that there are no more than 3 errors
     //
 

@@ -1,0 +1,366 @@
+\documentclass[11pt,a4paper,oneside]{report}             % Single-side
+
+\usepackage{t1enc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumerate}
+\usepackage{graphics}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{fancyvrb}
+\usepackage{anysize}
+\usepackage{sectsty}
+\usepackage{setspace}
+\usepackage[center]{caption}
+
+\usepackage{titlesec}
+	\titleformat{\chapter}[hang] 
+	{\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter:}{1em}{} 
+
+\usepackage[hidelinks]{hyperref}
+\usepackage{textcomp}
+\usepackage{graphicx}
+\usepackage{svg}
+
+\onehalfspacing
+
+\def\doubleunderline#1{\underline{\underline{#1}}}
+\def\dul#1{\doubleunderline{#1}}
+\def\ul#1{\underline{#1}}
+\newcommand{\vect}[2]{\begin{bmatrix} #1 \\ #2 \end{bmatrix}}
+\setcounter{MaxMatrixCols}{20}
+
+\begin{document}
+
+% Title page ==================================================================================
+\begin{titlepage}
+\begin{center}
+{\huge Fast decoding of systematic Golay-24 code } 
+\vspace{0.5cm}
+
+\vfill
+{\large \today}
+\end{center}
+\end{titlepage}
+
+\chapter{Introduction}
+
+The Golay forward error correction code was invented by Marcel Golay in 1949. Its most well-known
+use was onboard the NASA Voyager satellites where they used the Golay(24, 12, 8) code. These days
+we know codes with much better error correction capabilities, but the Golay code is still a good
+choice in applications where the size of each packet is small and/or the available hardware
+resources are too modest, so there is no chance to use more complicated codes.
+
+The topic of this study is the \emph{systematic Golay(24, 12, 8)} code. The aim is to present a
+new algorithm which can quickly and efficiently decode this coding scheme even on machines with
+limited compute capabilities, such as embedded systems.
+
+This study not only presents the algorithm but also proves its correctness.
+
+\section{Definitons}
+
+\doubleunderline{A} is the Golay matrix.
+
+\[
+    \doubleunderline{A} = 
+    \begin{bmatrix}
+            1 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 1 \\
+            0 & 1 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 1 & 0 \\
+            0 & 0 & 1 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 1 \\
+            1 & 0 & 0 & 1 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 \\
+            1 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 1 & 1 & 0 & 1 \\
+            1 & 1 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 1 & 1 & 0 \\
+            1 & 1 & 1 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 & 1 \\
+            1 & 1 & 1 & 1 & 1 & 0 & 0 & 1 & 0 & 0 & 1 & 0 \\
+            0 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 1 & 0 & 0 & 1 \\
+            0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 1 & 1 & 0 \\
+            0 & 1 & 0 & 1 & 0 & 1 & 0 & 1 & 0 & 1 & 1 & 1 \\
+            1 & 0 & 1 & 0 & 1 & 0 & 1 & 0 & 1 & 0 & 1 & 1
+    \end{bmatrix}
+\]
+
+Assuming that messages are column vectors, \doubleunderline{G} is the generator matrix
+of the systematic Golay(24, 12, 8) code.
+
+\[
+    \doubleunderline{G} =
+    \begin{bmatrix}
+        \doubleunderline{I} \\
+        \doubleunderline{A}
+    \end{bmatrix}
+\]
+
+If \underline{m} is the message to be encoded, and the parity vector is \underline{p},
+then the encoded code word is \underline{x}.
+
+\[
+    \underline{x} = \begin{bmatrix}
+        \underline{m} \\
+        \underline{p}
+    \end{bmatrix} = \doubleunderline{G} \cdot \underline{m} = \begin{bmatrix}
+        \doubleunderline{I} \\
+        \doubleunderline{A}
+    \end{bmatrix} \cdot \underline{m} = \begin{bmatrix}
+        \doubleunderline{I} \cdot \underline{m} \\
+        \doubleunderline{A} \cdot \underline{m}
+    \end{bmatrix} = \begin{bmatrix}
+        \underline{m} \\
+        \doubleunderline{A} \cdot \underline{m}
+    \end{bmatrix}
+\]
+
+If we transmit the \underline{x} code word through a noisy channel, the received code word might
+contain errors. The error vector is \underline{e} and the received code word is \underline{r}.
+
+\[
+    \ul{r} = \ul{x} + \ul{e} = \vect{\ul{r}_m}{\ul{r}_p} = \vect{\ul{m} + \ul{e}_m}{\ul{p} + \ul{e}_p}
+\]
+
+\subsubsection{Inverse and transpose of the Golay matrix}
+
+The \dul{A} Golay matrix is its own inverse and transpose.
+
+\[
+    \dul{A}^T = \dul{A}
+\]
+\[
+    \dul{A}^{-1} = \dul{A}
+\]
+
+Consequences:
+\begin{itemize}
+    \item \ul{A} is an invertable linear transformation, so if $\ul{p} = \dul{A} \cdot \ul{m}$, then
+          $\dul{A} \cdot \ul{p} = \dul{A} \cdot \dul{A} \cdot \ul{m} = \dul{A} \cdot \dul{A}^{-1} \cdot \ul{m} = \ul{m}$.
+          In other words, the message can be restored from the parity vector.
+    \item We only need to store the \ul{A} matrix in memory, we don't need its inverse or transpose.
+\end{itemize}
+
+\subsubsection{Parity of messages with 1 Hamming weight}
+
+If $\ul{m} = \ul{I}_{i}$, then $\ul{p} = \dul{A} \cdot \ul{m} = \dul{A} \cdot \ul{I}_{i} = \ul{A}_{i}$.
+So if the message is the same as the $i$th row of the identity matrix, then the parity vector is the
+same as the $i$th row of the Golay matrix.
+
+\subsubsection{Hamming weight of code words from non-zero Hamming weight messages}
+
+If $\ul{m} \neq \ul{0}$, then $w\{ \ul{x} \} = w\{ \ul{m} \} + w\{ \ul{p} \} \geq 8$.
+
+Proof:
+We already know that the Hamming distance between every possible code word is at least 8.
+The $\ul{m} = \ul{0}$ message is encoded to the code word $\ul{x} = \ul{0}$, so
+the minimal Hamming distance of every possible code word can only be at least 8 if
+in case of $\ul{m} \neq \ul{0}$ the $w\{ \ul{x} \} = \geq 8$, otherwise there
+would be a code word $\ul{x}$ whose Hamming distance from the $\ul{0}$ code word is less than 8.
+
+Consequences:
+\begin{itemize}
+    \item $\forall \ul{m} \neq \ul{0} : w\{ \dul{A} \cdot \ul{m} \} \geq 8$
+\end{itemize}
+
+\chapter{Algorithm}
+
+This chapter shows the decoding algorithm. We will make the assumption that $w\{\ul{e}\} \leq 4$,
+so the received vector contains at most 4 bit errors. This is reasonable because the Golay(24, 12, 8)
+code is only capable to correct at most 3 bit errors, and detect 4 bit errors. Since the minimal
+Hamming distance between each code word is 8, in case of 4 bit errors it is possible to create the
+received vector from multiple different code words, therefore it is not possible to tell which was
+the original.
+
+\section{Basics}
+
+These are a couple of lemmas which need to be proved in order to show the correctness of the algorithm.
+
+\subsubsection{Lemma 1.}
+
+If $w\{\ul{e}\} \leq 4$ and $w\{\dul{A} \cdot \ul {r_m} + \ul{r}_p\} \leq 3$,
+then $w\{\ul{e}_m\} = 0$. So, if we calculate the parity from the received message, and
+the Hamming distance between the calculated parity and the received parity is less than
+or equal to 3, then the received message is error-free.
+
+Proof:
+
+Let's suppose that the statement is false, and $\ul{e}_m \neq \ul{0}$.
+The given expression looks like:
+
+\[
+    \dul{A} \cdot \ul{r}_m + \ul{r}_p =
+    \dul{A} \cdot ( \ul{m} + \ul{e}_m ) + ( \ul{p} + \ul{e}_p ) =
+    \dul{A} \cdot \ul{m} + \dul{A} \cdot \ul{e}_m + \dul{A} \cdot \ul{m} + \ul{e}_p =
+    \dul{A} \cdot \ul{e}_m + \ul{e}_p
+\]
+
+The minimum Hamming distance between every possible code word is 8, therefore
+in case of $\forall \ul{e}_m \neq \ul{0}$ the following is true:
+$w\{ \ul{e}_m \} +  w\{ \dul{A} \cdot \ul{e}_m \} \geq 8$.
+(See "Hamming weight of code words from non-zero Hamming weight messages" above.)
+
+Let's define $w\{ \ul{e}_m \} = N$, then because $w\{ \ul{e} \} \leq 4$ the following
+will also be true: $w\{ \ul{e}_p \} \leq 4 - N$.
+So, $w\{ \dul{A} \cdot \ul{e}_m \} \geq 8 - N$.
+
+So according to the above, we get this:
+\[
+    w\{ \dul{A} \cdot \ul{e}_m + \ul{e}_p \} \geq (8 - N) - (4 - N) = 4
+\]
+
+What we got is that when $\ul{e}_m \neq \ul{0}$, then
+$w\{ \dul{A} \cdot \ul{e}_m + \ul{e}_p \} \geq 4$ which is a contradiction.
+
+So we can conclude that the statement is true, and $\ul{e}_m = \ul{0}$.
+
+\subsubsection{Lemma 2.}
+
+If $2 \leq w\{\ul{e}\} \leq 4$ and $w\{\dul{A} \cdot \ul{r}_m + \ul{A}_i + \ul{r}_p\} \leq 2$,
+then $\ul{e}_m = \ul{I}_i$. So if we assume the number of errors to be at least 2 but at most 4,
+and we correct a 1-bit error $\ul{e}_{m, i} = \ul{I}_i$ in the received message, then we calculate
+the parity of the corrected message, and the Hamming distance between the calculated parity and
+the received parity is less than or equal to 2, then the received message contains exactly 1 error,
+and that error is the $i$th row of the identity matrix, which is what we corrected.
+
+Proof.
+
+Consider the $\ul{r}_2 = \vect{\ul{r}_{m,2}}{\ul{r}_{p,2}} = \vect{\ul{r}_m + \ul{I}_i}{\ul{r}_p}$ received word!
+
+Because of Lemma 1, we know that
+if $w\{ \dul{A} \cdot \ul{r}_{m,2} + \ul{r}_{p,2} \} \leq 3$, then $\ul{e}_{m,2} = \ul{0}$.
+
+The above formula of $\ul{r}_2$ yields the following result:
+
+\[
+    \dul{A} \cdot \ul{r}_{m,2} + \ul{r}_{p,2} =
+    \dul{A} \cdot ( \ul{r}_m + \ul{I}_i ) + \ul{r}_p =
+    \dul{A} \cdot \ul{r}_m + \dul{A} \cdot \ul{I}_i + \ul{r}_p =
+    \dul{A} \cdot \ul{r}_m + \ul{A}_i + \ul{r}_p
+\]
+
+The above conditions contain $w \{ \dul{A} \cdot \ul{r}_m + \ul{A}_i + \ul{r}_p \} \leq 2$,
+so for the received word $\ul{r}_2$ the following is true: $\ul{e}_{m,2} = \ul{0}$.
+
+Since $\ul{r}$ only differs from $\ul{r}_2$ by only 1 message bit, the error of the parity is
+$\ul{e}_p = \ul{e}_{p,2}$. The differing message bit is at $\ul{I}_i$.
+So if $\ul{e}_{m,2} = \ul{0}$, then $\ul{e}_m = \ul{I}_i$.
+
+\subsubsection{Lemma 3.}
+
+Same as Lemma 1, but the other way around:
+
+If $w\{\ul{e}\} \leq 4$ and $w\{\dul{A} \cdot \ul {r_p} + \ul{r}_m\} \leq 3$,
+then $w\{\ul{e}_p\} = 0$. So, if we calculate the message from the received parity, and
+the Hamming distance between the calculated message and the received message is less than
+or equal to 3, then the received parity is error-free. (And the received message is
+$\dul{A} \cdot \ul {r_p}$.)
+
+\subsubsection{Lemma 4.}
+
+Same as Lemma 2, but the other way around:
+
+If $2 \leq w\{\ul{e}\} \leq 4$ and $w\{\dul{A} \cdot \ul{r}_p + \ul{A}_i + \ul{r}_m\} \leq 2$,
+then $\ul{e}_p = \ul{I}_i$. So if we assume the number of errors to be at least 2 but at most 4,
+and we correct a 1-bit error $\ul{e}_{p, i} = \ul{I}_i$ in the received parity, then we calculate
+the message of the corrected parity, and the Hamming distance between the calculated message and
+the received message is less than or equal to 2, then the received parity contains exactly 1 error,
+and that error is the $i$th row of the identity matrix, which is what we corrected.
+
+\section{Steps of the algorithm}
+
+\subsubsection{Step 1.}
+
+Consider the $\ul{r}$ received vector.
+Split $\ul{r}$ into message and parity:
+
+\[
+    \ul{r} = \vect{\ul{r}_m}{\ul{r}_p}
+\]
+
+\subsubsection{Step 2.}
+
+Calculate the parity of the received message part: $\ul{p}_2 = \dul{A} \cdot \ul{r}_m$.
+
+\subsubsection{Step 3.}
+
+If $\ul{p}_2 = \dul{A} \cdot \ul{r}_m = \ul{p}$ then the received word contains no error, so we're done.
+
+\subsubsection{Step 4.}
+
+When the received message is error-free but the parity contains $w\{\ul{e}_p\} \leq 3$ errors, then according to
+\emph{Lemma 1} we can tell this by looking at the Hamming distance between the received parity $\ul{r}_p$ and
+the calculated parity $\ul{p}_2$ which is $d = w\{\ul{r}_p + \ul{p}_2\}$.
+
+If $d \leq 3$ then the received message is error-free, and only the received parity contained at most 3 errors.
+
+\subsubsection{Step 5.}
+
+Calculate the message from the received parity, which will be $\ul{m_2} = \dul{A} \cdot \ul{r}_p$.
+
+\subsubsection{Step 6.}
+
+When the received parity is error-free but the received message has $w\{\ul{e}_m\} \leq 3$ errors, then according to
+\emph{Lemma 2} we can tell this by looking at the Hamming distance between the received message $\ul{r}_m$
+and the calculated message $\ul{m_2}$ which is $d = w\{\ul{r}_m + \ul{m_2}\}$.
+
+If $d \leq 3$ then the received parity is error-free, and only the received message contained at most 3 errors.
+So the decoded message is $\ul{m_2}$.
+
+\subsubsection{Step 7.}
+
+So far, the algorithm has covered every possible 1-bit error and all the 2 and 3-bit errors which were
+limited to only the message or the parity. Let's now deal with the case where the received message contains 1 error,
+and the received parity contains 1 or 2 errors.
+
+For $\forall i : 1 \leq i \leq 12, \ul{e}_m = \ul{I}_i$ cases, let's look at the possible 1-bit errors of the
+received message, and correct them in the following manner:
+
+\[
+    \ul{r}_{corr, i} = \vect{\ul{r}_{m, corr, i}}{\ul{r}_{p, corr, i}} = \vect{\ul{r}_m + \ul{I}_i}{\ul{r}_p + \ul{A}_i}
+\]
+
+Let's also calculate the parity of the corrected message:
+
+\[
+    \ul{p}_{i} = \dul{A} \cdot \ul{r}_{m, corr, i}
+\]
+
+There are 12 possible corrections, the right one is the case when:
+
+\[
+    w\{\ul{p}_{i} + \ul{r}_{p, corr, i}\} \leq 2
+\]
+
+Thanks to \emph{Lemma 2}, whichever $\ul{r}_{corr, i}$ satisfies the above formula, the correspoding $\ul{r}_{m, corr, i}$ will be
+the decoded message.
+
+\subsubsection{Step 8.}
+
+Let's deal with the cases when the received parity has 1 error, and the received message has 1 or 2 errors.
+
+For $\forall i : 1 \leq i \leq 12, \ul{e}_p = \ul{I}_i$ cases, let's look at the possible 1-bit errors of the
+received parity, and correct them in the following manner:
+
+\[
+    \ul{r}_{corr, i} = \vect{\ul{r}_{m, corr, i}}{\ul{r}_{p, corr, i}} = \vect{\ul{r}_m + \ul{A}_i}{\ul{r}_p + \ul{I}_i}
+\]
+
+Let's calculate the message from the corrected parity:
+
+\[
+    \ul{m}_{i} = \dul{A} \cdot \ul{r}_{p, corr, i}
+\]
+
+There are 12 possible corrections, the right one is the case when:
+
+\[
+    w\{\ul{m}_{i} + \ul{r}_{m, corr, i}\} \leq 2
+\]
+
+Thanks to \emph{Lemma 4}, whichever $\ul{r}_{corr, i}$ satisfies the above formula, the corresponding $\ul{m}_{i}$  will be
+the decoded message.
+
+\subsubsection{Step 9.}
+
+If the algorithm reached this point, it means that we've already covered all possible 1, 2 and 3 bit errors.
+So we've detected a 4-bit error which we can't correct.
+
+\end{document}
+
+

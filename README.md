@@ -40,7 +40,9 @@ used here is something else entirely.
 8. If we reached this point, we detected an unfixable 4-bit error.
 
 This approach can be mathematically proven using the fact that the Hamming distance
-between any two Golay-24 code words is at least 7.
+between any two Golay-24 code words is at least 8.
+
+The proof is also provided in this repository.
 
 The resulting algorithm is faster than syndrome-based decoding, because it requires
 fewer loop iterations, in fact correcting some types of errors doesn't need a loop
