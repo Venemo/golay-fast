@@ -10,7 +10,6 @@
 \usepackage{color}
 \usepackage{fancyvrb}
 \usepackage{anysize}
-\usepackage{sectsty}
 \usepackage{setspace}
 \usepackage[center]{caption}
 
@@ -50,13 +49,19 @@ The Golay forward error correction code was invented by Marcel Golay in 1949. It
 use was onboard the NASA Voyager satellites where they used the Golay(24, 12, 8) code. These days
 we know codes with much better error correction capabilities, but the Golay code is still a good
 choice in applications where the size of each packet is small and/or the available hardware
-resources are too modest, so there is no chance to use more complicated codes.
+resources are too modest, so there is no chance to use more complicated coding schemes.
 
-The topic of this study is the \emph{systematic Golay(24, 12, 8)} code. The aim is to present a
-new algorithm which can quickly and efficiently decode this coding scheme even on machines with
-limited compute capabilities, such as embedded systems.
+The topic of this study is the \emph{systematic Golay(24, 12, 8)} code, called \emph{Golay-24} for short.
+The aim is to present a new algorithm which can quickly and efficiently
+decode this coding scheme even on machines with limited compute capabilities,
+such as embedded systems.
 
 This study not only presents the algorithm but also proves its correctness.
+
+The algorithm presented here is a \emph{hard-decision} algorithm, since most of the embedded hardware
+that I've worked with make a hard decision about the received bits, so the aim was to make decoding
+efficient on this class of hardware.
+Further research needs to be done to determine if the ideas presented here can be utilized in soft-decision algorithms.
 
 \section{Definitions}
 
@@ -92,6 +97,7 @@ This study not only presents the algorithm but also proves its correctness.
 
 If \underline{m} is the message (which we want to encode), and the parity vector is \underline{p},
 then the encoded code word is \underline{x}.
+The Hamming weight of the code word is $w\{\ul{x}\} = w\{\ul{m}\} + w\{\ul{p}\}$.
 
 \[
     \underline{x} = \begin{bmatrix}
@@ -109,7 +115,7 @@ then the encoded code word is \underline{x}.
     \end{bmatrix}
 \]
 
-If we transmit the \underline{x} code word through a noisy channel, the received word might
+If the \underline{x} code word is transmitted through a noisy channel, the received word might
 contain errors. The error vector is \underline{e} (the error vector in the received message 
 is $\underline{e}_m$ and the error vector in the received parity is $\underline{e}_p$)
 and the received word is \underline{r}.
@@ -117,6 +123,10 @@ and the received word is \underline{r}.
 \[
     \ul{r} = \ul{x} + \ul{e} = \vect{\ul{r}_m}{\ul{r}_p} = \vect{\ul{m} + \ul{e}_m}{\ul{p} + \ul{e}_p}
 \]
+
+The Golay-24 code is capable of correcting 3 or fewer
+bit errors, and detecting 4 bit errors. So the cases we care about the most are when $w\{\ul{e}\} \leq 3$
+or $w\{\ul{e}\} = 4$.
 
 \chapter{Algorithm}
 
@@ -128,6 +138,8 @@ received vector from multiple different code words, therefore it is not possible
 the original.
 
 \section{Basics}
+
+First a few basic considerations are presented on which the algorithm is based.
 
 \subsubsection{Inverse and transpose of the Golay matrix}
 
@@ -145,19 +157,19 @@ Consequences:
     \item \dul{A} is an invertable linear transformation, so if $\ul{p} = \dul{A} \cdot \ul{m}$, then
           $\dul{A} \cdot \ul{p} = \dul{A} \cdot \dul{A} \cdot \ul{m} = \dul{A} \cdot \dul{A}^{-1} \cdot \ul{m} = \ul{m}$.
           In other words, the message can be restored from the parity vector.
-    \item We only need to store the \ul{A} matrix in memory, we don't need its inverse or transpose.
+    \item We only need to store the \dul{A} matrix in memory, and we don't need to ever invert or transpose it.
 \end{itemize}
 
 \subsubsection{Parity of messages with 1 Hamming weight}
 
 If $\ul{m} = \ul{I}_{i}$, then $\ul{p} = \dul{A} \cdot \ul{m} = \dul{A} \cdot \ul{I}_{i} = \ul{A}_{i}$.
-So if the message is the same as the $i$th row of the identity matrix, then the parity vector is the
-same as the $i$th row of the Golay matrix.
+So if the message is the same as the $i$th row of the identity matrix $\dul{I}$, then the parity vector is the
+same as the $i$-th row of the Golay matrix $\dul{A}$.
 
 Consequences:
 \begin{itemize}
-    \item When correcting a single bit error $\ul{I}_{i}$ in the message, the parity needs to be corrected by $\ul{A}_{i}$.
-    \item When correcting a single bit error $\ul{I}_{i}$ in the parity, the message needs to be corrected by $\ul{A}_{i}$.
+    \item When changing a single bit at $\ul{I}_{i}$ in the message, the equivalent change to the parity is $\ul{A}_{i}$.
+    \item When changing a single bit at $\ul{I}_{i}$ in the parity, the equivalent change to the message is $\ul{A}_{i}$.
 \end{itemize}
 
 \subsubsection{Hamming weight of code words from non-zero Hamming weight messages}
@@ -254,11 +266,13 @@ So if $\ul{e}_{m,2} = \ul{0}$, then $\ul{e}_m = \ul{I}_i$.
 Same as Lemma 1, but the other way around:
 
 If $w\{\ul{e}\} \leq 4$ and $w\{\dul{A} \cdot \ul {r_p} + \ul{r}_m\} \leq 3$,
-then $w\{\ul{e}_p\} = 0$  (which is equivalent to $\ul{e}_m = \ul{0}$).
+then $w\{\ul{e}_p\} = 0$  (which is equivalent to $\ul{e}_p = \ul{0}$).
 So, if we calculate the message from the received parity, and
 the Hamming distance between the calculated message and the received message is less than
 or equal to 3, then the received parity is error-free. (And the received message is
 $\dul{A} \cdot \ul {r_p}$.)
+
+This can be proved in the exact same way as Lemma 1.
 
 \subsubsection{Lemma 4.}
 
@@ -270,6 +284,8 @@ and we correct a 1-bit error $\ul{e}_{p, i} = \ul{I}_i$ in the received parity, 
 the message of the corrected parity, and the Hamming distance between the calculated message and
 the received message is less than or equal to 2, then the received parity contains exactly 1 error,
 and that error is the $i$th row of the identity matrix, which is what we corrected.
+
+This can be proved in the exact same way as Lemma 2.
 
 \section{Steps of the algorithm}
 
